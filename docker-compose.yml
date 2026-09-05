@@ -1,0 +1,66 @@
+# =====================================================================
+#  Családi Plex
+#
+#  Egyetlen alkalmazás, egyetlen image. Ugyanez a fájl fut a fejlesztői
+#  gépen és a production szerveren is - a különbség csak a .env tartalma.
+#
+#  A qBittorrent NEM része ennek a stacknek: az alkalmazás a már futó
+#  qBittorrent példányhoz csatlakozik a Web API-n keresztül
+#  (QBITTORRENT_URL / QBITTORRENT_USERNAME / QBITTORRENT_PASSWORD).
+#
+#  Az alkalmazásnak nincs szüksége a média- vagy letöltési könyvtárakra:
+#  a torrentet fájlfeltöltésként adja át a qBittorrentnek, a fájlokhoz
+#  soha nem nyúl.
+# =====================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: csaladi-plex:latest
+    container_name: csaladi-plex
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      # A ${APP_PORT} a hoston, a 8000 a konténerben.
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      # SQLite adatbázis (felhasználók + letöltési előzmények).
+      - app-data:/data
+    networks:
+      - default
+      # Ha a qBittorrent egy másik Compose projektben fut, tedd ugyanarra a
+      # külső hálózatra, és vedd ki a kommentet innen és a networks blokkból.
+      # - media
+
+  # Opcionális teszt-szolgáltatás: ugyanez az image, más paranccsal.
+  # nCore + qBittorrent Web API utánzat, hogy a felület a valódi
+  # rendszerekhez való hozzáférés nélkül is végigpróbálható legyen.
+  # Indítás:  docker compose --profile mock up -d
+  # Ilyenkor a .env-ben:  NCORE_URL=http://mock:9080  QBITTORRENT_URL=http://mock:9080
+  mock:
+    profiles: ["mock"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: csaladi-plex:latest
+    container_name: csaladi-plex-mock
+    restart: unless-stopped
+    command: ["uvicorn", "devtools.mock_server:app", "--host", "0.0.0.0", "--port", "9080"]
+    expose:
+      - "9080"
+    networks:
+      - default
+
+volumes:
+  app-data:
+
+networks:
+  default:
+  # A qBittorrenttel közös, kívülről létrehozott hálózat.
+  # Létrehozás egyszer:  docker network create media
+  # Ezután a qBittorrent konténert is csatlakoztatni kell rá.
+  # media:
+  #   external: true
