@@ -126,6 +126,7 @@ docker compose up -d --build
 Ellenőrzés:
 
 ```bash
+docker compose run --rm app python -m app.cli check-login
 docker compose run --rm app python -m app.cli check-qbittorrent
 docker compose run --rm app python -m app.cli check-ncore
 ```
@@ -450,6 +451,7 @@ python -m devtools.smoke_test
 | Keresés fut, de 0 találat mindenre | Elképzelhető, hogy az nCore megváltoztatta a találati oldal HTML szerkezetét. Lásd lentebb. |
 | „Ez a torrent már szerepel a letöltések között.” | A qBittorrentben már megvan ugyanez a torrent. |
 | „Nincs elég szabad tárhely a letöltéshez.” | A qBittorrent gépén nincs hely. |
+| „Hibás felhasználónév vagy jelszó", pedig jó a jelszó | Fusson le: `docker compose run --rm app python -m app.cli check-login`. Ez megmondja, hogy a hash sérült-e, vagy csak a konténer újraindítása hiányzik. A leggyakoribb ok: a `.env` szerkesztése után nem futott `docker compose up -d`. |
 | A bejelentkezés után azonnal kidob | Változott az `APP_SECRET_KEY` (a régi sütik érvénytelenek) – jelentkezz be újra. HTTPS mögött állítsd `COOKIE_SECURE=true`. |
 | `env file .env not found` | Nem futott le a `cp .env.example .env`. |
 

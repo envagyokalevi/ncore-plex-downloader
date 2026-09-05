@@ -50,10 +50,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await db.init()
     await db.sync_users(settings.users)
     if not settings.users:
-        logger.warning(
-            "Nincs beallitva felhasznalo. Allitsd be az ADMIN_USERNAME es "
-            "ADMIN_PASSWORD_HASH ertekeket a .env fajlban."
+        logger.error(
+            "Nincs beallitva felhasznalo, igy semmilyen belepes nem fog mukodni. "
+            "Allitsd be az ADMIN_USERNAME es ADMIN_PASSWORD_HASH ertekeket a .env "
+            "fajlban, majd inditsd ujra: docker compose up -d"
         )
+    else:
+        # A leggyakoribb telepitesi hiba a serult jelszo-hash - erre azonnal
+        # szoljunk, ne csak a sikertelen belepesnel derüljön ki.
+        from app.cli import describe_hash_problem
+
+        for username, password_hash in settings.users.items():
+            problem = describe_hash_problem(password_hash)
+            if problem:
+                logger.error(
+                    "A(z) '%s' felhasznalo jelszo-hash-e hibas: %s "
+                    "(ellenorzes: python -m app.cli check-login)",
+                    username,
+                    problem,
+                )
 
     ncore_client = ncore_integration.build_client(
         base_url=settings.ncore_url,
