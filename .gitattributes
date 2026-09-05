@@ -1,0 +1,8 @@
+# Egységes LF sorvégek minden platformon (Windows <-> macOS <-> Linux).
+# Enélkül a Dockerfile és a Python fájlok CRLF-fel kerülnének ki, ami a
+# Linux konténerben hibát okozhat.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
