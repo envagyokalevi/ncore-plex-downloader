@@ -111,6 +111,12 @@ async def test_login_failure_maps_to_auth_error(status: int, body: str) -> None:
         await client.login()
 
 
+async def test_login_accepts_204_no_content() -> None:
+    """qBittorrent 5.x sikeres belepesnel 204-et ad ures torzzsel, "Ok." nelkul."""
+    client = make_client(lambda request: httpx.Response(204))
+    await client.login()
+
+
 async def test_connection_error_maps_to_unavailable() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("nincs kapcsolat", request=request)
@@ -224,6 +230,50 @@ async def test_add_torrent_already_exists() -> None:
         return default_handler(request)
 
     with pytest.raises(TorrentAlreadyExistsError):
+        await make_client(handler).add_torrent(TORRENT_BYTES)
+
+
+async def test_add_torrent_already_exists_409() -> None:
+    """qBittorrent 5.x mar hozzaadott torrentnel 409-et ad, nem szoveget."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/v2/torrents/add":
+            return httpx.Response(409, text="Conflict")
+        return default_handler(request)
+
+    with pytest.raises(TorrentAlreadyExistsError):
+        await make_client(handler).add_torrent(TORRENT_BYTES)
+
+
+async def test_add_torrent_accepts_json_success_response() -> None:
+    """qBittorrent 5.x sikeres hozzaadasnal JSON objektumot ad "Ok." helyett."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/v2/torrents/add":
+            return httpx.Response(
+                200,
+                json={
+                    "added_torrent_ids": ["a" * 40],
+                    "failure_count": 0,
+                    "pending_count": 0,
+                    "success_count": 1,
+                },
+            )
+        return default_handler(request)
+
+    await make_client(handler).add_torrent(TORRENT_BYTES)
+
+
+async def test_add_torrent_json_response_with_failures_raises() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/v2/torrents/add":
+            return httpx.Response(
+                200,
+                json={"added_torrent_ids": [], "failure_count": 1, "success_count": 0},
+            )
+        return default_handler(request)
+
+    with pytest.raises(QbitAddError):
         await make_client(handler).add_torrent(TORRENT_BYTES)
 
 

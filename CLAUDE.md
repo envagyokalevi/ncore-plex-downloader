@@ -54,9 +54,18 @@ kitalálás):
 
 **qBittorrent Web API v2** (forrás: hivatalos WebUI API wiki):
 
-- `POST /api/v2/auth/login` (`username`, `password`) → `Ok.` + SID cookie
+- `POST /api/v2/auth/login` (`username`, `password`) → SID cookie. A válasz
+  verziófüggő: régebbi qBittorrentek `200` + `Ok.` szöveggel, az 5.x sorozat
+  (élőben ellenőrizve 5.2.3-mal) `204 No Content`-tel, üres törzzsel. A
+  kliens mindkettőt sikerként kezeli. Hibás jelszó → `401`; IP-tiltás túl sok
+  próbálkozás után → `403`.
 - `GET /api/v2/app/defaultSavePath`, `/app/preferences`, `/app/version`
-- `POST /api/v2/torrents/add` — multipart, `torrents` mező a fájl
+- `POST /api/v2/torrents/add` — multipart, `torrents` mező a fájl. Sikeres
+  válasz szintén verziófüggő: régebbi verziók `Ok.` szöveget adnak, az 5.x
+  sorozat (élőben ellenőrizve 5.2.3-mal) JSON objektumot
+  (`{"added_torrent_ids": [...], "failure_count": 0, ...}`). Már hozzáadott
+  torrentnél az 5.x `409 Conflict`-ot ad (régebbi verziók `200`-at
+  "already" szöveggel).
 - `GET /api/v2/torrents/info?hashes=<pipe-al elválasztva>`
 - **5.x: `/torrents/stop` és `/torrents/start`**; 4.x: `/pause`, `/resume`.
   A kliens az újat próbálja, 404/405/501 esetén visszaesik a régire.
@@ -158,7 +167,9 @@ Diagnosztika élő rendszeren: `python -m app.cli check-login` /
   `NcorePatterns` a `ncore.py`-ban.
 - nCore 2FA nincs támogatva.
 - Nincs lapozás: az első oldal, seed szerint csökkenő, `NCORE_MAX_RESULTS`-ig.
-- Csak film-kategóriák (alapból HD/HU); sorozat nincs bekapcsolva.
+- Alapból film HD/HU és sorozat HD/HU (`hd_hun,hdser_hun`) van bekapcsolva;
+  más kategóriák (`hd`, `hdser`, SD/DVD változatok) a `NCORE_CATEGORIES`-ban
+  konfigurálhatók, kódjuk az `ncore.py` `CATEGORY_LABELS`-jában.
 - A Letöltések oldal 3 mp-es pollingot használ, nem WebSocketet.
 - Egyetlen nCore fiókon osztozik minden családtag.
 - A `docker-compose.yml` `env_file: .env` miatt egy friss klón `.env` nélkül
@@ -177,5 +188,5 @@ Diagnosztika élő rendszeren: `python -m app.cli check-login` /
 ## Következő lehetséges lépések
 
 Plex library scan indítása torrent elkészültekor · Plex-struktúrába rendezés
-hardlinkkel (hogy a seedelés megmaradjon) · sorozat-kategóriák · lapozás a
+hardlinkkel (hogy a seedelés megmaradjon) · lapozás a
 találatokban · több nCore fiók.

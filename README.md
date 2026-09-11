@@ -149,7 +149,7 @@ fájlban. A leggyakrabban állított értékek:
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD_HASH` | Az első családtag. |
 | `EXTRA_USERS` | További családtagok: `anya:$2b$...,gyerek:$2b$...` |
 | `NCORE_USERNAME` / `NCORE_PASSWORD` | nCore belépés (csak a backend látja). |
-| `NCORE_CATEGORIES` | `hd_hun` = Film HD/HU. Bővíthető: `hd_hun,hd`. |
+| `NCORE_CATEGORIES` | `hd_hun` = Film HD/HU, `hdser_hun` = Sorozat HD/HU. Bővíthető: `hd_hun,hdser_hun,hd,hdser`. |
 | `QBITTORRENT_URL` | A futó qBittorrent Web UI címe. |
 | `QBITTORRENT_USERNAME` / `QBITTORRENT_PASSWORD` | qBittorrent Web UI belépés. |
 | `QBITTORRENT_CATEGORY` | Opcionális címke az innen indított torrenteknek. |

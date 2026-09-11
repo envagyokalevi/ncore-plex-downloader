@@ -2,11 +2,19 @@
 
 Az endpointok a hivatalos WebUI API dokumentációjából származnak:
   POST /api/v2/auth/login            username, password  -> SID cookie
+    Sikeres belepes valasza verziofuggo: regebbi qBittorrentek "200 Ok."-t
+    adnak, az 5.x-es sorozat (pl. 5.2.3) "204 No Content"-et, ures torzzsel.
+    Mindket alakot el kell fogadni sikerkent (elo qBittorrent 5.2.3-mal
+    ellenorizve). Hibas jelszo: 401; IP-tiltas tul sok probalkozas utan: 403.
   GET  /api/v2/app/version
   GET  /api/v2/app/webapiVersion
   GET  /api/v2/app/preferences       -> JSON (tartalmazza a save_path-ot)
   GET  /api/v2/app/defaultSavePath   -> alapértelmezett letöltési könyvtár
   POST /api/v2/torrents/add          multipart: torrents=<fájl>, savepath, category...
+    Sikeres valasz szinten verziofuggo: regebbi qBittorrentek "Ok." szoveget
+    adnak, az 5.x sorozat JSON objektumot ({"added_torrent_ids": [...],
+    "failure_count": 0, ...}). Mar hozzaadott torrentnel az 5.x "409
+    Conflict"-ot ad (regebbi verziok 200-at "already" szoveggel).
   GET  /api/v2/torrents/info         hashes=<pipe-al elválasztva>
   POST /api/v2/torrents/stop|pause   hashes
   POST /api/v2/torrents/start|resume hashes
@@ -133,7 +141,13 @@ class QBittorrentClient:
             if response.status_code == 403:
                 logger.warning("qBittorrent login tiltva (IP ban vagy tul sok proba)")
                 raise QbitAuthError()
-            if response.status_code != 200 or "Ok." not in response.text:
+            # A qBittorrent verziotol fuggoen a sikeres belepes valasza vagy
+            # "200 Ok." (regebbi verziok), vagy "204 No Content" ures torzzsel
+            # (5.x). Mindket alakot el kell fogadni.
+            success = response.status_code == 204 or (
+                response.status_code == 200 and "Ok." in response.text
+            )
+            if not success:
                 logger.warning("qBittorrent login sikertelen (HTTP %s)", response.status_code)
                 raise QbitAuthError()
 
@@ -187,15 +201,32 @@ class QBittorrentClient:
 
         response = await self._request("POST", "/api/v2/torrents/add", data=data, files=files)
 
+        if response.status_code == 409:
+            # 5.x: mar hozzaadott torrent ujra-kuldesekor (regebbi verziok
+            # 200-at adnak "already" szoveggel - lasd lejjebb).
+            logger.info("qBittorrent: a torrent mar korabban hozzaadva (HTTP 409)")
+            raise TorrentAlreadyExistsError()
         if response.status_code == 415:
             logger.warning("qBittorrent elutasitotta a torrent fajlt (HTTP 415)")
-            raise QbitAddError()
+            raise QbitAddError(detail=response.text[:200])
         if response.status_code != 200:
             logger.warning("qBittorrent torrent hozzaadas HTTP %s", response.status_code)
             self._raise_add_error(response.text)
+
         body = response.text.strip()
-        if body and body.lower() not in {"ok.", "ok"}:
+        if not body or body.lower() in {"ok.", "ok"}:
+            return
+        # Az 5.x sorozat sikeres valasza JSON objektum, nem "Ok." szoveg:
+        # {"added_torrent_ids": [...], "failure_count": 0, "pending_count": 0,
+        #  "success_count": 1} (elo qBittorrent 5.2.3-mal ellenorizve).
+        try:
+            payload = response.json()
+        except ValueError:
             self._raise_add_error(body)
+            return
+        if isinstance(payload, dict) and payload.get("failure_count", 1) == 0:
+            return
+        self._raise_add_error(body)
 
     @staticmethod
     def _raise_add_error(body: str) -> None:
