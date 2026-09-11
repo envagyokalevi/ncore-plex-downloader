@@ -4,10 +4,24 @@ from __future__ import annotations
 
 import pytest
 
-from app.cli import describe_hash_problem
+from app.cli import _escape_for_env_file, describe_hash_problem
 from app.security import hash_password
 
 VALID = hash_password("valami-jelszo")
+
+
+def test_escape_for_env_file_doubles_dollar_signs() -> None:
+    """A hash-password kimenetet ez teszi biztonságossá .env-be másolásra."""
+    assert _escape_for_env_file("$2b$12$abc") == "$$2b$$12$$abc"
+
+
+def test_escaped_hash_still_resolves_as_valid() -> None:
+    """A dupla '$' pontosan azt a nyers hash-t kell, hogy visszaadja, amit a
+    docker compose a .env feldolgozása után a konténerbe juttat."""
+    escaped = _escape_for_env_file(VALID)
+    resolved = escaped.replace("$$", "$")  # ezt vegzi el a docker compose
+    assert resolved == VALID
+    assert describe_hash_problem(resolved) is None
 
 
 def test_valid_hash_has_no_problem() -> None:

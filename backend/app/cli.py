@@ -40,6 +40,17 @@ def _prompt_password(prompt: str = "Jelszó: ") -> str | None:
         return None
 
 
+def _escape_for_env_file(value: str) -> str:
+    """A `$` jeleket megduplázza, hogy a docker compose .env-értelmezése ne nyelje el.
+
+    A docker compose a `.env` fájlt is feldolgozza valtozo-behelyettesitesre
+    (nem csak a konteneren belüli kornyezeti valtozokent adja tovabb), ezert
+    egy nyers bcrypt hash `$`-jelei elvesznenek/csonkulnanak, ha nyersen
+    masoljuk be. Lasd meg: describe_hash_problem.
+    """
+    return value.replace("$", "$$")
+
+
 def _hash_password() -> int:
     password = _prompt_password()
     if password is None:
@@ -56,7 +67,12 @@ def _hash_password() -> int:
     print()
     print("A .env fájlban CSERÉLD LE erre a teljes sort (ne írd a régi mögé):")
     print()
-    print(f"ADMIN_PASSWORD_HASH={hash_password(password)}")
+    print(f"ADMIN_PASSWORD_HASH={_escape_for_env_file(hash_password(password))}")
+    print()
+    print(
+        "(A '$' jeleket szándékosan dupláztuk - ezt várja el a docker compose "
+        "a .env fájl feldolgozásakor, különben csonkul a hash.)"
+    )
     print()
     print("Ezután indítsd újra:  docker compose up -d")
     return 0
